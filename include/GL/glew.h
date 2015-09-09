@@ -99,6 +99,10 @@
 
 #if defined(_WIN32)
 
+#ifdef __MINGW32__
+#include <basetsd.h>
+#endif
+
 /*
  * GLEW does not include <windows.h> to avoid name space pollution.
  * GL needs GLAPI and GLAPIENTRY, GLU needs APIENTRY, CALLBACK, and wchar_t
