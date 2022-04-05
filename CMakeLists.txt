@@ -272,8 +272,8 @@ install (FILES
 install(EXPORT glew-targets DESTINATION ${PACKAGE_CONFIG_DIR}
   NAMESPACE GLEW::)
 install(FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/glew-config.cmake
-  ${CMAKE_CURRENT_SOURCE_DIR}/CopyImportedTargetProperties.cmake
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake/glew-config.cmake
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake/CopyImportedTargetProperties.cmake
   DESTINATION ${PACKAGE_CONFIG_DIR})
 
 if(NOT TARGET uninstall)
