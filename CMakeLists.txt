@@ -20,6 +20,8 @@ cmake_minimum_required (VERSION 3.10)
 
 include(GNUInstallDirs)
 
+set(PACKAGE_CONFIG_DIR "share/cmake/GLEW" CACHE STRING "Directory for package config files (relative to CMAKE_INSTALL_PREFIX).")
+
 set(CMAKE_DEBUG_POSTFIX d)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake)
 
@@ -267,14 +269,12 @@ install (FILES
   ${GLEW_DIR}/include/GL/glxew.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/GL)
 
-if(MAYBE_EXPORT)
-  install(EXPORT glew-targets DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glew
-    NAMESPACE GLEW::)
-  install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/glew-config.cmake
-    ${CMAKE_CURRENT_SOURCE_DIR}/CopyImportedTargetProperties.cmake
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glew)
-endif()
+install(EXPORT glew-targets DESTINATION ${PACKAGE_CONFIG_DIR}
+  NAMESPACE GLEW::)
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/glew-config.cmake
+  ${CMAKE_CURRENT_SOURCE_DIR}/CopyImportedTargetProperties.cmake
+  DESTINATION ${PACKAGE_CONFIG_DIR})
 
 if(NOT TARGET uninstall)
   configure_file(
