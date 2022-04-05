@@ -10,11 +10,15 @@ include(GNUInstallDirs)
 
 if(POLICY CMP0003)
   cmake_policy (SET CMP0003 NEW)
-endif()
+endif ()
 
 if(POLICY CMP0042)
   cmake_policy (SET CMP0042 NEW)
-endif()
+endif ()
+
+if(POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW)
+endif ()
 
 set(CMAKE_DEBUG_POSTFIX d)
 
