@@ -1,18 +1,7 @@
-See doc/index.html for more information.
+GLEW
+====
 
-If you downloaded the tarball from the GLEW website, you just need to:
+Welcome to the OpenCMISS fork of the GLEW library.
+The *main* branch isn't used, look at the *develop* branch for the current latest worked on branch.
+The versioned branches are more stable and get updated when improvements have been tested across a number of systems.
 
-    Unix:
-
-        make
-
-    Windows:
-
-        use the project file in build/vc6/
-
-If you wish to build GLEW from scratch (update the extension data from
-the net or add your own extension information), you need a Unix
-environment (including wget, perl, and GNU make).  The extension data
-is regenerated from the top level source directory with:
-
-        make extensions
