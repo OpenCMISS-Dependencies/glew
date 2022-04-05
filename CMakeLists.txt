@@ -4,7 +4,7 @@ endif ()
 
 project (glew C)
 
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.10)
 
 include(GNUInstallDirs)
 
@@ -21,11 +21,17 @@ set(CMAKE_DEBUG_POSTFIX d)
 option (BUILD_UTILS "utilities" ON)
 option (GLEW_REGAL "Regal mode" OFF)
 option (GLEW_OSMESA "OSMesa mode" OFF)
+option (GLEW_BUILD_STATIC "Static library" ON)
+option (GLEW_BUILD_SHARED "Shared library" OFF)
 if (APPLE)
-    option (BUILD_FRAMEWORK "Build Framework bundle for OSX" OFF)
+  option (BUILD_FRAMEWORK "Build Framework bundle for OSX" OFF)
 endif ()
 
-set (GLEW_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+if (NOT GLEW_BUILD_STATIC AND NOT GLEW_BUILD_SHARED)
+  message(FATAL_ERROR "Must build either share or static library.")
+endif ()
+
+set(GLEW_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # get version from config/version
 file (STRINGS ${GLEW_DIR}/config/version  _VERSION_MAJOR_STRING REGEX "GLEW_MAJOR[ ]*=[ ]*[0-9]+.*")
@@ -104,35 +110,48 @@ if (WIN32)
   list (APPEND GLEW_SRC_FILES ${GLEW_DIR}/build/glew.rc)
 endif ()
 
-add_library (glew SHARED ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
-set_target_properties (glew PROPERTIES COMPILE_DEFINITIONS "GLEW_BUILD" OUTPUT_NAME "${GLEW_LIB_NAME}" PREFIX "${DLL_PREFIX}"
-                                       VERSION ${GLEW_VERSION}
-                                       SOVERSION ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR})
-add_library (glew_s STATIC ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
-set_target_properties (glew_s PROPERTIES COMPILE_DEFINITIONS "GLEW_STATIC" OUTPUT_NAME "${GLEW_LIB_NAME}" PREFIX lib)
+if (GLEW_BUILD_SHARED)
+  add_library (glew SHARED ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
+  set_target_properties (glew PROPERTIES COMPILE_DEFINITIONS "GLEW_BUILD" OUTPUT_NAME "${GLEW_LIB_NAME}" PREFIX "${DLL_PREFIX}"
+                                         VERSION ${GLEW_VERSION}
+                                         SOVERSION ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR})
+endif ()
+
+if (GLEW_BUILD_STATIC)
+  add_library (glew_s STATIC ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
+  set_target_properties (glew_s PROPERTIES COMPILE_DEFINITIONS "GLEW_STATIC" OUTPUT_NAME "${GLEW_LIB_NAME}" PREFIX lib)
+endif ()
 
 if (MSVC)
   # add options from visual studio project
-  target_compile_definitions (glew PRIVATE "GLEW_BUILD;VC_EXTRALEAN")
-  target_compile_definitions (glew_s PRIVATE "GLEW_STATIC;VC_EXTRALEAN")
-  target_link_libraries (glew LINK_PRIVATE -BASE:0x62AA0000)
-  # kill security checks which are dependent on stdlib
-  target_compile_options (glew PRIVATE -GS-)
-  target_compile_options (glew_s PRIVATE -GS-)
+  if (GLEW_BUILD_SHARED)
+    target_compile_definitions (glew PRIVATE "GLEW_BUILD;VC_EXTRALEAN")
+    target_link_libraries (glew LINK_PRIVATE -BASE:0x62AA0000)
+    target_compile_options (glew PRIVATE -GS-)
+    target_link_libraries (glew LINK_PRIVATE -nodefaultlib -noentry)
+    target_link_libraries (glew LINK_PRIVATE libvcruntime.lib)
+    target_link_libraries (glew LINK_PRIVATE msvcrt.lib )
+  endif ()
+  if (GLEW_BUILD_STATIC)
+    target_compile_definitions (glew_s PRIVATE "GLEW_STATIC;VC_EXTRALEAN")
+    # kill security checks which are dependent on stdlib
+    target_compile_options (glew_s PRIVATE -GS-)
+  endif ()
   # remove stdlib dependency
-  target_link_libraries (glew LINK_PRIVATE -nodefaultlib -noentry)
-  target_link_libraries (glew LINK_PRIVATE libvcruntime.lib)
-  target_link_libraries (glew LINK_PRIVATE msvcrt.lib )
   string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
 elseif (WIN32 AND ((CMAKE_C_COMPILER_ID MATCHES "GNU") OR (CMAKE_C_COMPILER_ID MATCHES "Clang")))
   # remove stdlib dependency on windows with GCC and Clang (for similar reasons
   # as to MSVC - to allow it to be used with any Windows compiler)
-  target_compile_options (glew PRIVATE -fno-builtin -fno-stack-protector)
-  target_compile_options (glew_s PRIVATE -fno-builtin -fno-stack-protector)
-  target_link_libraries (glew LINK_PRIVATE -nostdlib)
+  if (GLEW_BUILD_SHARED)
+    target_compile_options (glew PRIVATE -fno-builtin -fno-stack-protector)
+    target_link_libraries (glew LINK_PRIVATE -nostdlib)
+  endif ()
+  if (GLEW_BUILD_STATIC)
+    target_compile_options (glew_s PRIVATE -fno-builtin -fno-stack-protector)
+  endif ()
 endif ()
 
-if (BUILD_FRAMEWORK)
+if (BUILD_FRAMEWORK AND GLEW_BUILD_SHARED)
   set_target_properties(glew PROPERTIES
     FRAMEWORK TRUE
     FRAMEWORK_VERSION ${GLEW_VERSION}
@@ -145,30 +164,27 @@ if (BUILD_FRAMEWORK)
   )
 endif()
 
-target_link_libraries (glew LINK_PUBLIC ${GLEW_LIBRARIES})
-target_link_libraries (glew_s ${GLEW_LIBRARIES})
-
-if(CMAKE_VERSION VERSION_LESS 2.8.12)
-  set(MAYBE_EXPORT "")
-else()
+if (GLEW_BUILD_SHARED)
+  target_link_libraries (glew LINK_PUBLIC ${GLEW_LIBRARIES})
+  target_include_directories(glew PUBLIC $<INSTALL_INTERFACE:include>)
+endif ()
+if (GLEW_BUILD_STATIC)
+  target_link_libraries (glew_s ${GLEW_LIBRARIES})
   target_compile_definitions(glew_s INTERFACE "GLEW_STATIC")
-  foreach(t glew glew_s)
-    target_include_directories(${t} PUBLIC $<INSTALL_INTERFACE:include>)
-  endforeach()
-  set(MAYBE_EXPORT EXPORT glew-targets)
-endif()
+  target_include_directories(glew_s PUBLIC $<INSTALL_INTERFACE:include>)
+endif ()
 
 set(targets_to_install "")
-if(NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS)
+if(GLEW_BUILD_SHARED)
   list(APPEND targets_to_install glew)
 endif()
 
-if(NOT DEFINED BUILD_SHARED_LIBS OR NOT BUILD_SHARED_LIBS)
+if(GLEW_BUILD_STATIC)
   list(APPEND targets_to_install glew_s)
 endif()
 
 install ( TARGETS ${targets_to_install}
-          ${MAYBE_EXPORT}
+          EXPORT glew-targets
           RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -181,7 +197,7 @@ if (BUILD_UTILS)
     list (APPEND GLEWINFO_SRC_FILES ${GLEW_DIR}/build/glewinfo.rc)
   endif ()
   add_executable (glewinfo ${GLEWINFO_SRC_FILES})
-  if(NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS)
+  if(GLEW_BUILD_SHARED)
      target_link_libraries (glewinfo glew)
   else()
      target_link_libraries (glewinfo glew_s)
@@ -195,7 +211,7 @@ if (BUILD_UTILS)
     list (APPEND VISUALINFO_SRC_FILES ${GLEW_DIR}/build/visualinfo.rc)
   endif ()
   add_executable (visualinfo ${VISUALINFO_SRC_FILES})
-  if(NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS)
+  if(GLEW_BUILD_SHARED)
      target_link_libraries (visualinfo glew)
   else()
      target_link_libraries (visualinfo glew_s)
@@ -229,35 +245,35 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/glew.pc
 )
 
 if(WIN32 AND MSVC AND (NOT MSVC_VERSION LESS 1600) AND (NOT CMAKE_VERSION VERSION_LESS "3.1"))
-    install(
-        FILES $<TARGET_PDB_FILE:glew>
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        CONFIGURATIONS Debug RelWithDebInfo
-    )
+  install(
+    FILES $<TARGET_PDB_FILE:glew>
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    CONFIGURATIONS Debug RelWithDebInfo
+  )
 endif()
 
 install (FILES
-    ${GLEW_DIR}/include/GL/wglew.h
-    ${GLEW_DIR}/include/GL/glew.h
-    ${GLEW_DIR}/include/GL/glxew.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/GL)
+  ${GLEW_DIR}/include/GL/wglew.h
+  ${GLEW_DIR}/include/GL/glew.h
+  ${GLEW_DIR}/include/GL/glxew.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/GL)
 
 if(MAYBE_EXPORT)
   install(EXPORT glew-targets DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glew
     NAMESPACE GLEW::)
   install(FILES
-      ${CMAKE_CURRENT_SOURCE_DIR}/glew-config.cmake
-      ${CMAKE_CURRENT_SOURCE_DIR}/CopyImportedTargetProperties.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/glew-config.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/CopyImportedTargetProperties.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glew)
 endif()
 
 if(NOT TARGET uninstall)
   configure_file(
-      ${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-      IMMEDIATE @ONLY)
+    ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake/cmake_uninstall.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/cmake_uninstall.cmake
+    IMMEDIATE @ONLY)
 
   add_custom_target(uninstall
-      COMMAND ${CMAKE_COMMAND} -P
-      ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+    COMMAND ${CMAKE_COMMAND} -P
+    ${CMAKE_CURRENT_BINARY_DIR}/build/cmake/cmake_uninstall.cmake)
 endif()
