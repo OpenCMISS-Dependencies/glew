@@ -2,12 +2,6 @@ if ( NOT DEFINED CMAKE_BUILD_TYPE )
   set( CMAKE_BUILD_TYPE Release CACHE STRING "Build type" )
 endif ()
 
-project (glew C)
-
-cmake_minimum_required (VERSION 3.10)
-
-include(GNUInstallDirs)
-
 if(POLICY CMP0003)
   cmake_policy (SET CMP0003 NEW)
 endif ()
@@ -20,7 +14,14 @@ if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif ()
 
+project (glew C)
+
+cmake_minimum_required (VERSION 3.10)
+
+include(GNUInstallDirs)
+
 set(CMAKE_DEBUG_POSTFIX d)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake)
 
 option (BUILD_UTILS "utilities" ON)
 option (GLEW_REGAL "Regal mode" OFF)
@@ -50,7 +51,11 @@ set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-find_package (OpenGL REQUIRED)
+if (GLEW_OSMESA)
+  find_package (OSMesa REQUIRED)
+else ()
+  find_package (OpenGL REQUIRED)
+endif ()
 
 # X11 required except for Windows and Apple OSX platforms
 if (NOT WIN32 AND NOT APPLE)
