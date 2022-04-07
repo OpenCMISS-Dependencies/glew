@@ -27,7 +27,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/cmake)
 
 option (BUILD_UTILS "utilities" ON)
 option (GLEW_REGAL "Regal mode" OFF)
-option (GLEW_OSMESA "OSMesa mode" OFF)
+option (GLEW_BUILD_OSMESA "OSMesa mode" OFF)
 option (GLEW_BUILD_STATIC "Static library" ON)
 option (GLEW_BUILD_SHARED "Shared library" OFF)
 if (APPLE)
@@ -53,7 +53,7 @@ set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-if (GLEW_OSMESA)
+if (GLEW_BUILD_OSMESA)
   find_package (OSMesa REQUIRED)
 else ()
   find_package (OpenGL REQUIRED)
@@ -89,15 +89,8 @@ endif ()
 
 #### OSMesa mode ####
 
-if (GLEW_OSMESA)
-  if (WIN32)
-    set (OSMESA_LIB_NAME osmesa)
-  else ()
-    set (OSMESA_LIB_NAME OSMesa)
-  endif ()
-  add_definitions (-DGLEW_OSMESA)
-  set (GLEW_LIBRARIES ${OSMESA_LIB_NAME} ${OPENGL_LIBRARIES})
-  set (X11_LIBRARIES)
+if (GLEW_BUILD_OSMESA)
+  set (GLEW_OSMESA_LIBRARIES ${OSMESA_LIB_NAME})
 endif ()
 
 #### EGL ####
@@ -133,6 +126,11 @@ if (GLEW_BUILD_STATIC)
   set_target_properties (glew_s PROPERTIES COMPILE_DEFINITIONS "GLEW_STATIC" OUTPUT_NAME "${GLEW_LIB_NAME}" PREFIX lib)
 endif ()
 
+if (GLEW_BUILD_OSMESA)
+  add_library (glew_s_osmesa STATIC ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
+  set_target_properties (glew_s_osmesa PROPERTIES COMPILE_DEFINITIONS "GLEW_STATIC;GLEW_OSMESA" OUTPUT_NAME "${GLEW_LIB_NAME}-osmesa" PREFIX lib)
+endif ()
+
 if (MSVC)
   # add options from visual studio project
   if (GLEW_BUILD_SHARED)
@@ -148,6 +146,11 @@ if (MSVC)
     # kill security checks which are dependent on stdlib
     target_compile_options (glew_s PRIVATE -GS-)
   endif ()
+  if (GLEW_BUILD_OSMESA)
+    target_compile_definitions (glew_s_osmesa PRIVATE "VC_EXTRALEAN")
+    # kill security checks which are dependent on stdlib
+    target_compile_options (glew_s_osmesa PRIVATE -GS-)
+  endif ()
   # remove stdlib dependency
   string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
 elseif (WIN32 AND ((CMAKE_C_COMPILER_ID MATCHES "GNU") OR (CMAKE_C_COMPILER_ID MATCHES "Clang")))
@@ -159,6 +162,9 @@ elseif (WIN32 AND ((CMAKE_C_COMPILER_ID MATCHES "GNU") OR (CMAKE_C_COMPILER_ID M
   endif ()
   if (GLEW_BUILD_STATIC)
     target_compile_options (glew_s PRIVATE -fno-builtin -fno-stack-protector)
+  endif ()
+  if (GLEW_BUILD_OSMESA)
+    target_compile_options (glew_s_osmesa PRIVATE -fno-builtin -fno-stack-protector)
   endif ()
 endif ()
 
@@ -186,6 +192,12 @@ if (GLEW_BUILD_STATIC)
   target_include_directories(glew_s PUBLIC $<INSTALL_INTERFACE:include>)
   set_target_properties(glew_s PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif ()
+if (GLEW_BUILD_OSMESA)
+  target_link_libraries (glew_s_osmesa ${OSMesa_LIBRARIES})
+  target_compile_definitions(glew_s_osmesa INTERFACE "GLEW_STATIC")
+  target_include_directories(glew_s_osmesa PUBLIC $<INSTALL_INTERFACE:include>)
+  set_target_properties(glew_s_osmesa PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
 
 set(targets_to_install "")
 if(GLEW_BUILD_SHARED)
@@ -194,6 +206,10 @@ endif()
 
 if(GLEW_BUILD_STATIC)
   list(APPEND targets_to_install glew_s)
+endif()
+
+if(GLEW_BUILD_OSMESA)
+  list(APPEND targets_to_install glew_s_osmesa)
 endif()
 
 install ( TARGETS ${targets_to_install}
@@ -233,8 +249,8 @@ if (BUILD_UTILS)
     target_link_libraries(visualinfo ${X11_LIBRARIES})
   endif ()
 
-  install ( TARGETS glewinfo visualinfo
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install (TARGETS glewinfo visualinfo
+           DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif ()
 
 set (prefix ${CMAKE_INSTALL_PREFIX})
