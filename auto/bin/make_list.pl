@@ -1,5 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 ##
+## Copyright (C) 2008-2019, Nigel Stewart <nigels[]users sourceforge net>
 ## Copyright (C) 2002-2008, Marcelo E. Magallon <mmagallo[]debian org>
 ## Copyright (C) 2002-2008, Milan Ikits <milan ikits[]ieee org>
 ##
@@ -10,6 +11,7 @@
 use strict;
 use warnings;
 
+use lib '.';
 do 'bin/make.pl';
 
 #---------------------------------------------------------------------------------------
@@ -32,35 +34,42 @@ if (@ARGV)
 
 	foreach my $ext (sort @extlist)
 	{
-		my ($extname, $exturl, $extstring, $types, $tokens, $functions, $exacts) = parse_ext($ext);
+		my ($extname, $exturl, $extstring, $reuse, $types, $tokens, $functions, $exacts) = parse_ext($ext);
 
 		my $extvar = $extname;
 		$extvar =~ s/GL(X*)_/GL$1EW_/;
 
 		my $extpre = $extname;
-		$extpre =~ s/^(W?)GL(X?).*$/\l$1gl\l$2ew/;
+		$extpre =~ s/^(W?E?)GL(X?).*$/\l$1gl\l$2ew/;
 
 		#my $pextvar = prefix_varname($extvar);
 
-		print "#ifdef $extname\n";
+		if (length($extstring) && $extstring !~ /^GL_/ || keys %$functions)
+		{
+			print "#ifdef $extname\n";
+		}
 
-                if (length($extstring))
-                {
-		        print "  CONST_CAST(" . $extvar . ") = " . $extpre . "GetExtension(\"$extstring\");\n";
-                }
+		if (length($extstring) && $extstring !~ /^GL_/)
+		{
+			print "  " . $extvar . " = _glewSearchExtension(\"$extstring\", extStart, extEnd);\n";
+		}
 
 		if (keys %$functions)
 		{
 			if ($extname =~ /WGL_.*/)
 			{
-				print "  if (glewExperimental || " . $extvar . "|| crippled) CONST_CAST(" . $extvar . ")= !_glewInit_$extname(GLEW_CONTEXT_ARG_VAR_INIT);\n";
+				print "  if (glewExperimental || " . $extvar . "|| crippled) " . $extvar . "= !_glewInit_$extname();\n";
 			}
 			else
 			{
-				print "  if (glewExperimental || " . $extvar . ") CONST_CAST(" . $extvar . ") = !_glewInit_$extname(GLEW_CONTEXT_ARG_VAR_INIT);\n";
+				print "  if (glewExperimental || " . $extvar . ") " . $extvar . " = !_glewInit_$extname();\n";
 			}
 		}
-		print "#endif /* $extname */\n";
+
+		if (length($extstring) && $extstring !~ /^GL_/ || keys %$functions)
+		{
+			print "#endif /* $extname */\n";
+		}
 	}
 
 }

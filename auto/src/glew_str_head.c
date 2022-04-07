@@ -1,10 +1,6 @@
-#ifdef GLEW_MX
-GLboolean glewContextIsSupported (GLEWContext* ctx, const char* name)
-#else
-GLboolean glewIsSupported (const char* name)
-#endif
+GLboolean GLEWAPIENTRY glewIsSupported (const char* name)
 {
-  GLubyte* pos = (GLubyte*)name;
+  const GLubyte* pos = (const GLubyte*)name;
   GLuint len = _glewStrLen(pos);
   GLboolean ret = GL_TRUE;
   while (ret && len > 0)

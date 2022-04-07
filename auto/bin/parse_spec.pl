@@ -1,5 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 ##
+## Copyright (C) 2008-2019, Nigel Stewart <nigels[]users sourceforge net>
 ## Copyright (C) 2002-2008, Marcelo E. Magallon <mmagallo[]debian org>
 ## Copyright (C) 2002-2008, Milan Ikits <milan ikits[]ieee org>
 ##
@@ -20,7 +21,8 @@ my @sections = (
     "Name",
     "Name Strings?",
     "New Procedures and Functions",
-    "New Tokens",
+    "New Tokens.*",                    # Optional (GL/WGL/GLX/...) suffix
+    "Additions to Chapter.*",
 );
 
 my %typemap = (
@@ -60,15 +62,31 @@ my %typemap = (
     charARB => "GLcharARB",
     handleARB => "GLhandleARB",
 
+    char => "GLchar",
+
     # OpenGL 3.2 and GL_ARB_sync
 
     int64  => "GLint64",
     uint64 => "GLuint64",
     sync   => "GLsync",
 
+    # GL_EXT_EGL_image_storage
+
+    eglImageOES => "GLeglImageOES",
+
     # AMD_debug_output
 
     DEBUGPROCAMD => "GLDEBUGPROCAMD",
+
+    # ARB_debug_output
+
+    DEBUGPROCARB => "GLDEBUGPROCARB",
+
+    # KHR_debug
+
+    DEBUGPROC => "GLDEBUGPROC",
+
+    VULKANPROCNV => "GLVULKANPROCNV",
 
     vdpauSurfaceNV => "GLvdpauSurfaceNV",
     
@@ -124,6 +142,14 @@ my %fnc_ignore_list = (
     "ProgramLocalParameter4fARB"    => "ARB_vertex_program",
     "ProgramLocalParameter4fvARB"   => "ARB_vertex_program",
     "ProgramStringARB"              => "ARB_vertex_program",
+    "EGLImageTargetTexture2DOES"    => "OES_EGL_image",
+    "FramebufferTextureOES"         => "GL_OES_geometry_shader",
+    "PatchParameteriOES"            => "GL_OES_tessellation_shader",
+    "PointSizePointerOES"           => "GL_OES_point_size_array",
+    "LockArraysEXT"                 => "EXT_compiled_vertex_array",
+    "UnlockArraysEXT"               => "EXT_compiled_vertex_array",
+    "CoverageMaskNV"                => "NV_coverage_sample",
+    "CoverageOperationNV"           => "NV_coverage_sample",
     "glXCreateContextAttribsARB"    => "ARB_create_context_profile",
     "wglCreateContextAttribsARB"    => "WGL_ARB_create_context_profile",
 );
@@ -133,10 +159,10 @@ my %regex = (
     extname  => qr/^[A-Z][A-Za-z0-9_]+$/,
     none     => qr/^\(none\)$/,
     function => qr/^(.+) ([a-z][a-z0-9_]*) \((.+)\)$/i,
-    prefix   => qr/^(?:[aw]?gl|glX)/, # gl | agl | wgl | glX
-    tprefix  => qr/^(?:[AW]?GL|GLX)_/, # GL_ | AGL_ | WGL_ | GLX_
+    prefix   => qr/^(?:[aw]?gl|glX|egl)/, # gl | agl | wgl | glX
+    tprefix  => qr/^(?:[AW]?GL|GLX|EGL)_/, # GL_ | AGL_ | WGL_ | GLX_
     section  => compile_regex('^(', join('|', @sections), ')$'), # sections in spec
-    token    => qr/^([A-Z0-9][A-Z0-9_]*):?\s+((?:0x)?[0-9A-F]+)(.*)$/, # define tokens
+    token    => qr/^([A-Z0-9][A-Z0-9_x]*):?\s+((?:0x)?[0-9A-Fa-f]+(u(ll)?)?)(|\s[^\?]*)$/, # define tokens
     types    => compile_regex('\b(', join('|', keys %typemap), ')\b'), # var types
     voidtype => compile_regex('\b(', keys %voidtypemap, ')\b '), # void type
 );
@@ -148,6 +174,7 @@ sub normalize_prototype
     s/\s+/ /g;                # multiple whitespace -> single space
     s/\<.*\>//g;              # remove <comments> from direct state access extension
     s/\<.*$//g;               # remove incomplete <comments> from direct state access extension
+    s#/\*.*\*/##g;            # remove /* ... */ comments
     s/\s*\(\s*/ \(/;          # exactly one space before ( and none after
     s/\s*\)\s*/\)/;           # no space before or after )
     s/\s*\*([a-zA-Z])/\* $1/; # "* identifier"
@@ -225,9 +252,12 @@ sub parse_spec($)
                         {
                             # apply typemaps
                             $return =~ s/$regex{types}/$typemap{$1}/og;
-                            $return =~ s/void\*/GLvoid */og;
+                            $return =~ s/GLvoid/void/og;
+                            $return =~ s/void\*/void */og;
                             $parms =~ s/$regex{types}/$typemap{$1}/og;
                             $parms =~ s/$regex{voidtype}/$voidtypemap{$1}/og;
+                            $parms =~ s/GLvoid/void/og;
+                            $parms =~ s/ void\* / void */og;
                         }
                         # add to functions hash
                         $functions{$name} = {
@@ -294,8 +324,7 @@ my @speclist = ();
 my %extensions = ();
 
 my $ext_dir = shift;
-my $reg_http = "http://www.opengl.org/registry/specs/";
-#my $reg_http = "http://oss.sgi.com/projects/ogl-sample/";
+my $reg_http = "https://www.khronos.org/registry/OpenGL/extensions/";
 
 # Take command line arguments or read list from file
 if (@ARGV)
@@ -316,14 +345,50 @@ foreach my $spec (sort @speclist)
         open EXT, ">$info";
         print EXT $ext . "\n";                       # Extension name
         my $specname = $spec;
-        $specname =~ s/registry\///;
+        $specname =~ s/OpenGL-Registry\/extensions\///;
         print EXT $reg_http . $specname . "\n";      # Extension info URL
         print EXT $ext . "\n";                       # Extension string
+        print EXT "\n";                              # Resuses nothing by default
 
         my $prefix = $ext;
         $prefix =~ s/^(.+?)(_.+)$/$1/;
-        foreach my $token (sort { hex ${$tokens}{$a} <=> hex ${$tokens}{$b} } keys %{$tokens})
-        {
+        foreach my $token (sort { 
+                if (${$tokens}{$a} eq ${$tokens}{$b}) {
+                        $a cmp $b
+                } else {
+                    if (${$tokens}{$a} =~ /_/) {
+                        if (${$tokens}{$b} =~ /_/) {
+                            $a cmp $b
+                        } else {
+                            -1
+                        }
+                    } else {
+                        if (${$tokens}{$b} =~ /_/) {
+                            1
+                        } else {
+                            if (${$tokens}{$a} =~ /u(ll)?$/) {
+                                if (${$tokens}{$b} =~ /u(ll)?$/) {
+                                    $a cmp $b
+                                } else {
+                                    -1
+                                }
+			    } else {
+                                if (${$tokens}{$b} =~ /u(ll)?$/) {
+                                    1
+                                } else {
+                                    if (hex ${$tokens}{$a} eq hex ${$tokens}{$b})
+                                    {
+                                        $a cmp $b
+                                    } else {
+                                        hex ${$tokens}{$a} <=> hex ${$tokens}{$b}
+                                    }
+                                }
+                            }
+                        }                    
+                    }
+                }
+            } keys %{$tokens})
+            {
             if ($token =~ /^$prefix\_.*/i)
             {
                 print EXT "\t" . $token . " " . ${\%{$tokens}}{$token} . "\n";

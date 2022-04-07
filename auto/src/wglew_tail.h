@@ -1,27 +1,17 @@
 /* ------------------------------------------------------------------------- */
 
-#ifdef GLEW_MX
+GLEWAPI GLenum GLEWAPIENTRY wglewInit ();
+GLEWAPI GLboolean GLEWAPIENTRY wglewIsSupported (const char *name);
 
-typedef struct WGLEWContextStruct WGLEWContext;
-GLEWAPI GLenum wglewContextInit (WGLEWContext* ctx);
-GLEWAPI GLboolean wglewContextIsSupported (WGLEWContext* ctx, const char* name);
-
-#define wglewInit() wglewContextInit(wglewGetContext())
-#define wglewIsSupported(x) wglewContextIsSupported(wglewGetContext(), x)
-
-#define WGLEW_GET_VAR(x) (*(const GLboolean*)&(wglewGetContext()->x))
-#define WGLEW_GET_FUN(x) wglewGetContext()->x
-
-#else /* GLEW_MX */
-
+#ifndef WGLEW_GET_VAR
 #define WGLEW_GET_VAR(x) (*(const GLboolean*)&x)
+#endif
+
+#ifndef WGLEW_GET_FUN
 #define WGLEW_GET_FUN(x) x
+#endif
 
-GLEWAPI GLboolean wglewIsSupported (const char* name);
-
-#endif /* GLEW_MX */
-
-GLEWAPI GLboolean wglewGetExtension (const char* name);
+GLEWAPI GLboolean GLEWAPIENTRY wglewGetExtension (const char *name);
 
 #ifdef __cplusplus
 }
