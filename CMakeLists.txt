@@ -128,7 +128,8 @@ endif ()
 
 if (GLEW_BUILD_OSMESA)
   add_library (glew_s_osmesa STATIC ${GLEW_PUBLIC_HEADERS_FILES} ${GLEW_SRC_FILES})
-  set_target_properties (glew_s_osmesa PROPERTIES COMPILE_DEFINITIONS "GLEW_STATIC;GLEW_OSMESA" OUTPUT_NAME "${GLEW_LIB_NAME}-osmesa" PREFIX lib)
+  set_target_properties (glew_s_osmesa PROPERTIES OUTPUT_NAME "${GLEW_LIB_NAME}-osmesa" PREFIX lib)
+  target_compile_definitions(glew_s_osmesa PUBLIC GLEW_STATIC GLEW_OSMESA)
 endif ()
 
 if (MSVC)
